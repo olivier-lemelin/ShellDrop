@@ -26,10 +26,10 @@ def write_code(filename, content):
     print("Writing done!")
 
 
-def invoke_compiler(src_file, dst_file):
+def invoke_compiler(src_file, dst_file, compiler, compiler_options):
     """Compiles the previously compiled code to a .exe binary."""
     print("Compiling '{}' to '{}'...".format(src_file, dst_file))
-    res = os.system("i686-w64-mingw32-gcc '{}' -o '{}' -s -O2".format(src_file, dst_file))
+    res = os.system("'{}' '{}' -o '{}' {}".format(compiler, src_file, dst_file, compiler_options))
     if res == 0:
         print("Compiled successfully!")
     else:
@@ -101,6 +101,9 @@ def main():
     parser = argparse.ArgumentParser(description="Generates droppers with an encrypted payload.")
     parser.add_argument('-o', '--output-file', default="poc", help='Name of the file to which the executable should be written.')
     parser.add_argument('-v', '--verbose', action='store_true', help='Increases verbosity.')
+
+    parser.add_argument('--compiler', default="i686-w64-mingw32-gcc", help="Compiler that should be used.")
+    parser.add_argument('--compiler-options', default="-s -O2", help="Compiler flags and options to pass in during the compilation program.")
 
     key_group = parser.add_mutually_exclusive_group()
     key_group.add_argument('--key-random', action='store_true', help="Generates a random string of bytes of the same size as the shellcode to encrypt the payload.")
@@ -178,7 +181,7 @@ def main():
     write_code(c_file, generated_code)
 
     # Compiles the .c file to an executable.
-    invoke_compiler(c_file, exe_file)
+    invoke_compiler(c_file, exe_file, args.compiler, args.compiler_options)
 
     # If we are not in verbose mode, we remove the temporary .c file.
     if not args.verbose:
