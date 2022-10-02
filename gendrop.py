@@ -132,6 +132,9 @@ def main():
 
     parser.add_argument('--sleep-evasion', default=0, type=int, help="Sleeps for x seconds when the program is initially launched.")
     parser.add_argument('--unhook-dll', action='append', help="Unhooks the indicated DLLs at runtime (C:\\Windows\\System32\\ntdll.dll).")
+
+    parser.add_argument('--arguments-count', default=0, type=int, help='Indicates the count of arguments that are expected. If this does not match, the process exits early.')
+
     parser.add_argument('--pre-nops', type=int, help="Preprends the shellcode with the given number of NOPs.")
 
     args = parser.parse_args()
@@ -189,6 +192,11 @@ def main():
     # Adds the sleep at the beginning of the execution.
     if args.sleep_evasion > 0:
         code_config["sleep_evasion"] = args.sleep_evasion
+
+    # Adds an argument checking routine at the beginning of the main.
+    if args.arguments_count > 0:
+        code_config["check_arguments_count"] = True
+        code_config["arguments_count"] = args.arguments_count
 
     # Adds the remote injection capability as required.
     if args.remote_inject and args.remote_inject_executable:

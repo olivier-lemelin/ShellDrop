@@ -93,7 +93,14 @@ void local_thread_execution() {
 }
 {% endif %}
 
-int main() {
+int main(int argc, char *argv[]) {
+
+  {% if options.check_arguments_count %}
+  if(argc != {{ options.arguments_count }}) {
+    return 0;
+  }
+  {% endif %}
+  
   {% if options.sleep_evasion and options.sleep_evasion > 0 %}
   Sleep({{ options.sleep_evasion * 1000 }});
   {% endif %}
